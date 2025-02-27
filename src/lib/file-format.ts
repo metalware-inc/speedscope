@@ -107,18 +107,40 @@ function importSpeedscopeProfile(
 
     const frameInfos: FrameInfo[] = frames.map((frame, i) => ({key: i, ...frame}))
 
+    // Track open frames to auto-close any left at the end
+    const openFrames: FrameInfo[] = []
+
     for (let ev of events) {
       switch (ev.type) {
         case FileFormat.EventType.OPEN_FRAME: {
-          profile.enterFrame(frameInfos[ev.frame], ev.at - startValue)
+          const frameInfo = frameInfos[ev.frame]
+          openFrames.push(frameInfo)
+          profile.enterFrame(frameInfo, ev.at - startValue)
           break
         }
         case FileFormat.EventType.CLOSE_FRAME: {
-          profile.leaveFrame(frameInfos[ev.frame], ev.at - startValue)
+          const frameInfo = frameInfos[ev.frame]
+          // Remove from the openFrames array
+          const index = openFrames.findIndex(f => f.key === frameInfo.key)
+          if (index !== -1) {
+            openFrames.splice(index, 1)
+          }
+          profile.leaveFrame(frameInfo, ev.at - startValue)
           break
         }
       }
     }
+
+    // Auto-close any frames that are still open at the end of the profile
+    for (let i = openFrames.length - 1; i >= 0; i--) {
+      const frameInfo = openFrames[i]
+      console.warn(
+        `Frame "${frameInfo.name}" was still open at end of profile. Closing automatically.`,
+      )
+      profile.leaveFrame(frameInfo, profile.getTotalWeight())
+    }
+
+    console.log('imported evented profile')
     return profile.build()
   }
 
