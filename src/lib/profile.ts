@@ -84,6 +84,7 @@ export class Frame extends HasWeights {
 
 export class CallTreeNode extends HasWeights {
   children: CallTreeNode[] = []
+  frame2child: Map<Frame, CallTreeNode> = new Map<Frame, CallTreeNode>()
 
   isRoot() {
     return this.frame === Frame.root
@@ -452,15 +453,14 @@ export class StackListProfileBuilder extends Profile {
     let framesInStack = new Set<Frame>()
 
     for (let frame of stack) {
-      const last = useAppendOrder
-        ? lastOf(node.children)
-        : node.children.find(c => c.frame === frame)
+      const last = useAppendOrder ? lastOf(node.children) : node.frame2child.get(frame)
       if (last && !last.isFrozen() && last.frame == frame) {
         node = last
       } else {
         const parent = node
         node = new CallTreeNode(frame, node)
         parent.children.push(node)
+        parent.frame2child.set(frame, node)
       }
       node.addToTotalWeight(weight)
 
@@ -604,15 +604,14 @@ export class CallTreeProfileBuilder extends Profile {
         }
       }
 
-      const last = useAppendOrder
-        ? lastOf(prevTop.children)
-        : prevTop.children.find(c => c.frame === frame)
+      const last = useAppendOrder ? lastOf(prevTop.children) : prevTop.frame2child.get(frame)
       let node: CallTreeNode
       if (last && !last.isFrozen() && last.frame == frame) {
         node = last
       } else {
         node = new CallTreeNode(frame, prevTop)
         prevTop.children.push(node)
+        prevTop.frame2child.set(frame, node)
       }
       stack.push(node)
     }

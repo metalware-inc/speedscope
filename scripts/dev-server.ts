@@ -2,6 +2,11 @@ import * as esbuild from 'esbuild'
 import {buildOptions, generateIndexHtml} from './esbuild-shared'
 
 async function main() {
+  process.on('SIGINT', () => {
+    console.log('Received SIGINT. Shutting down gracefully...')
+    process.exit(0) // Ensure the process exits gracefully
+  })
+
   const outdir = 'dist'
   let ctx = await esbuild.context({
     ...buildOptions,
