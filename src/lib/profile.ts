@@ -1,6 +1,7 @@
 import {lastOf, KeyedSet} from './utils'
 import {ValueFormatter, RawValueFormatter} from './value-formatters'
 import {FileFormat} from './file-format-spec'
+import RBTree from 'functional-red-black-tree'
 
 export interface FrameInfo {
   key: string | number
@@ -84,7 +85,7 @@ export class Frame extends HasWeights {
 
 export class CallTreeNode extends HasWeights {
   children: CallTreeNode[] = []
-  frame2child: Map<Frame, CallTreeNode> = new Map<Frame, CallTreeNode>()
+  frame2child: RBTree<Frame, CallTreeNode> = new RBTree<Frame, CallTreeNode>()
 
   isRoot() {
     return this.frame === Frame.root
@@ -460,7 +461,7 @@ export class StackListProfileBuilder extends Profile {
         const parent = node
         node = new CallTreeNode(frame, node)
         parent.children.push(node)
-        parent.frame2child.set(frame, node)
+        parent.frame2child.insert(frame, node)
       }
       node.addToTotalWeight(weight)
 
@@ -611,7 +612,7 @@ export class CallTreeProfileBuilder extends Profile {
       } else {
         node = new CallTreeNode(frame, prevTop)
         prevTop.children.push(node)
-        prevTop.frame2child.set(frame, node)
+        prevTop.frame2child.insert(frame, node)
       }
       stack.push(node)
     }
