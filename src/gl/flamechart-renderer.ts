@@ -18,8 +18,6 @@ interface RangeTreeNode {
 }
 
 class RangeTreeLeafNode implements RangeTreeNode {
-  private children: RangeTreeNode[] = []
-
   constructor(
     private batch: RectangleBatch,
     private bounds: Rect,
@@ -36,7 +34,7 @@ class RangeTreeLeafNode implements RangeTreeNode {
     return this.batch.getRectCount()
   }
   getChildren() {
-    return this.children
+    return []
   }
   getParity() {
     return this.numPrecedingRectanglesInRow % 2
