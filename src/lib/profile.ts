@@ -115,7 +115,7 @@ export class CallTreeNode extends HasWeights {
   // soa = Structure Of Arrays
   private static frozens = new DynamicBitset()
 
-  private index: number = -1
+  private index: number
 
   private lazyChildren: CallTreeNode[] | null = null
   private frame2child: RBTree<Frame, CallTreeNode> = null
@@ -217,7 +217,7 @@ export class Profile {
     private capacity: number,
   ) {
     this.totalWeight = totalWeight
-    this.smartWeights = new DynamicTypedArray<Float32Array>(Float32Array, capacity)
+    this.smartWeights = new DynamicTypedArray<Float32Array>(Float32Array)
   }
 
   shallowClone(): Profile {
@@ -337,7 +337,8 @@ export class Profile {
       }
 
       prevStack = prevStack.concat(toOpen)
-      value += this.smartWeights.get(sampleIndex++)
+      value += this.smartWeights.get(sampleIndex)
+      sampleIndex++
     }
 
     // Close frames that are open at the end of the trace
