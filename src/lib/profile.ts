@@ -1,6 +1,7 @@
 import {lastOf, KeyedSet} from './utils'
 import {ValueFormatter, RawValueFormatter} from './value-formatters'
 import {FileFormat} from './file-format-spec'
+// @ts-ignore
 import RBTree from 'functional-red-black-tree'
 
 export interface FrameInfo {
@@ -85,7 +86,7 @@ export class Frame extends HasWeights {
 
 export class CallTreeNode extends HasWeights {
   children: CallTreeNode[] = []
-  frame2child: RBTree<Frame, CallTreeNode> = new RBTree<Frame, CallTreeNode>()
+  private frame2child: RBTree<Frame, CallTreeNode> = null
 
   isRoot() {
     return this.frame === Frame.root
@@ -105,6 +106,20 @@ export class CallTreeNode extends HasWeights {
     readonly parent: CallTreeNode | null,
   ) {
     super()
+  }
+
+  childByFrame(frame: Frame): CallTreeNode | null {
+    if (!this.frame2child) {
+      return null
+    }
+    return this.frame2child.get(frame)
+  }
+
+  regFrameToChild(frame: Frame, child: CallTreeNode) {
+    if (!this.frame2child) {
+      this.frame2child = new RBTree<Frame, CallTreeNode>()
+    }
+    this.frame2child.insert(frame, child)
   }
 }
 
@@ -454,14 +469,14 @@ export class StackListProfileBuilder extends Profile {
     let framesInStack = new Set<Frame>()
 
     for (let frame of stack) {
-      const last = useAppendOrder ? lastOf(node.children) : node.frame2child.get(frame)
+      const last = useAppendOrder ? lastOf(node.children) : node.childByFrame(frame)
       if (last && !last.isFrozen() && last.frame == frame) {
         node = last
       } else {
         const parent = node
         node = new CallTreeNode(frame, node)
         parent.children.push(node)
-        parent.frame2child.insert(frame, node)
+        parent.regFrameToChild(frame, node)
       }
       node.addToTotalWeight(weight)
 
@@ -605,14 +620,14 @@ export class CallTreeProfileBuilder extends Profile {
         }
       }
 
-      const last = useAppendOrder ? lastOf(prevTop.children) : prevTop.frame2child.get(frame)
+      const last = useAppendOrder ? lastOf(prevTop.children) : prevTop.childByFrame(frame)
       let node: CallTreeNode
       if (last && !last.isFrozen() && last.frame == frame) {
         node = last
       } else {
         node = new CallTreeNode(frame, prevTop)
         prevTop.children.push(node)
-        prevTop.frame2child.insert(frame, node)
+        prevTop.regFrameToChild(frame, node)
       }
       stack.push(node)
     }
