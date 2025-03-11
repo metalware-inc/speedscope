@@ -1,4 +1,4 @@
-import {lastOf, KeyedSet} from './utils'
+import {lastOf, KeyedSet, DynamicBitset} from './utils'
 import {ValueFormatter, RawValueFormatter} from './value-formatters'
 import {FileFormat} from './file-format-spec'
 // @ts-ignore
@@ -109,6 +109,12 @@ export class Frame extends HasWeights {
 }
 
 export class CallTreeNode extends HasWeights {
+  // TODO: change to a Holder/Manager class that is easier to port to WebAssembly
+  private static selfWeights = new DynamicTypedArray<Float32Array>(Float32Array)
+  private static totalWeights = new DynamicTypedArray<Float32Array>(Float32Array)
+  // soa = Structure Of Arrays
+  private static frozens = new DynamicBitset()
+
   private index: number = -1
 
   private lazyChildren: CallTreeNode[] | null = null
@@ -120,21 +126,22 @@ export class CallTreeNode extends HasWeights {
   }
 
   // If a node is "frozen", it means it should no longer be mutated.
-  private frozen = false
   isFrozen() {
-    return this.frozen
+    return CallTreeNode.frozens.get(this.index)
   }
   freeze() {
-    this.frozen = true
+    CallTreeNode.frozens.set(this.index, true)
   }
 
   constructor(
     readonly frame: Frame,
     readonly parent: CallTreeNode | null,
-    readonly holder: NodeHolder,
   ) {
     super()
-    this.index = holder.register(this)
+    this.index = CallTreeNode.selfWeights.size()
+    CallTreeNode.selfWeights.push(0)
+    CallTreeNode.totalWeights.push(0)
+    CallTreeNode.frozens.push(false)
   }
 
   childByFrame = (frame: Frame): CallTreeNode | null =>
@@ -152,31 +159,19 @@ export class CallTreeNode extends HasWeights {
 
   getChildren = (): CallTreeNode[] =>
     this.lazyChildren ? this.lazyChildren : CallTreeNode.fakeChildren
-}
 
-class NodeHolder {
-  // Append and grouped root nodes
-  private static readonly cnReservedNodes: number = 2
-  private capacity: number
-
-  public selfWeight: DynamicTypedArray<Float32Array> // = 0
-  public totalWeight: DynamicTypedArray<Float32Array> //= 0
-
-  constructor(capacity: number) {
-    this.capacity = capacity + NodeHolder.cnReservedNodes
-    this.selfWeight = new DynamicTypedArray<Float32Array>(Float32Array, this.capacity)
-    this.totalWeight = new DynamicTypedArray<Float32Array>(Float32Array, this.capacity)
+  getTotalWeight(): number {
+    return CallTreeNode.totalWeights.get(this.index)
+  }
+  setTotalWeight(value: number): any {
+    CallTreeNode.totalWeights.set(this.index, value)
   }
 
-  getCapacity() {
-    return this.capacity - NodeHolder.cnReservedNodes
+  getSelfWeight(): number {
+    return CallTreeNode.selfWeights.get(this.index)
   }
-
-  register(node: CallTreeNode): number {
-    let index: number = this.selfWeight.size()
-    this.selfWeight.push(0)
-    this.totalWeight.push(0)
-    return index
+  setSelfWeight(value: number): any {
+    CallTreeNode.selfWeights.set(this.index, value)
   }
 }
 
@@ -192,9 +187,6 @@ export class Profile {
   protected totalWeight: number
 
   protected frames = new KeyedSet<Frame>()
-
-  // CallTreeNodes compressed into a structure of arrays
-  protected nodes: NodeHolder
 
   // Profiles store two call-trees.
   //
@@ -220,16 +212,18 @@ export class Profile {
 
   protected valueFormatter: ValueFormatter = new RawValueFormatter()
 
-  constructor(totalWeight: number, capacity: number) {
+  constructor(
+    totalWeight: number,
+    private capacity: number,
+  ) {
     this.totalWeight = totalWeight
-    this.nodes = new NodeHolder(capacity)
-    this.appendOrderCalltreeRoot = new CallTreeNode(Frame.root, null, this.nodes)
-    this.groupedCalltreeRoot = new CallTreeNode(Frame.root, null, this.nodes)
+    this.appendOrderCalltreeRoot = new CallTreeNode(Frame.root, null)
+    this.groupedCalltreeRoot = new CallTreeNode(Frame.root, null)
     this.smartWeights = new DynamicTypedArray<Float32Array>(Float32Array, capacity)
   }
 
   shallowClone(): Profile {
-    const profile = new Profile(this.totalWeight, this.nodes.getCapacity())
+    const profile = new Profile(this.totalWeight, this.capacity)
     Object.assign(profile, this)
     return profile
   }
@@ -541,7 +535,7 @@ export class StackListProfileBuilder extends Profile {
         node = last
       } else {
         const parent = node
-        node = new CallTreeNode(frame, node, this.nodes)
+        node = new CallTreeNode(frame, node)
         parent.regFrameToChild(frame, node)
       }
       node.addToTotalWeight(weight)
@@ -696,7 +690,7 @@ export class CallTreeProfileBuilder extends Profile {
       if (last && !last.isFrozen() && last.frame == frame) {
         node = last
       } else {
-        node = new CallTreeNode(frame, prevTop, this.nodes)
+        node = new CallTreeNode(frame, prevTop)
         prevTop.regFrameToChild(frame, node)
       }
       stack.push(node)
