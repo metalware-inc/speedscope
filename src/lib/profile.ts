@@ -28,7 +28,7 @@ export type SymbolRemapper = (
 
 export class HasWeights {
   private selfWeight = 0
-  private totalWeight = 0
+  public totalWeight = 0
   getSelfWeight() {
     return this.selfWeight
   }
@@ -85,8 +85,9 @@ export class Frame extends HasWeights {
 }
 
 export class CallTreeNode extends HasWeights {
-  children: CallTreeNode[] = []
+  private lazyChildren: CallTreeNode[] | null = null
   private frame2child: RBTree<Frame, CallTreeNode> = null
+  private static fakeChildren: CallTreeNode[] = []
 
   isRoot() {
     return this.frame === Frame.root
@@ -108,19 +109,21 @@ export class CallTreeNode extends HasWeights {
     super()
   }
 
-  childByFrame(frame: Frame): CallTreeNode | null {
-    if (!this.frame2child) {
-      return null
-    }
-    return this.frame2child.get(frame)
-  }
+  childByFrame = (frame: Frame): CallTreeNode | null =>
+    this.frame2child ? this.frame2child.get(frame) : null
 
   regFrameToChild(frame: Frame, child: CallTreeNode) {
     if (!this.frame2child) {
       this.frame2child = new RBTree<Frame, CallTreeNode>()
+      this.lazyChildren = []
     }
     this.frame2child.insert(frame, child)
+    // @ts-ignore
+    this.lazyChildren.push(child)
   }
+
+  getChildren = (): CallTreeNode[] =>
+    this.lazyChildren ? this.lazyChildren : CallTreeNode.fakeChildren
 }
 
 export interface ProfileGroup {
@@ -194,10 +197,8 @@ export class Profile {
   private totalNonIdleWeight: number | null = null
   getTotalNonIdleWeight() {
     if (this.totalNonIdleWeight === null) {
-      this.totalNonIdleWeight = this.groupedCalltreeRoot.children.reduce(
-        (n, c) => n + c.getTotalWeight(),
-        0,
-      )
+      let children = this.groupedCalltreeRoot.getChildren()
+      this.totalNonIdleWeight = children.reduce((n, c) => n + c.getTotalWeight(), 0)
     }
     return this.totalNonIdleWeight
   }
@@ -206,9 +207,13 @@ export class Profile {
   // classes. Once a Profile instance has been constructed, it should be treated
   // as immutable.
   protected sortGroupedCallTree() {
+    const totWeightCmp = (a: CallTreeNode, b: CallTreeNode) => b.totalWeight - a.totalWeight
     function visit(node: CallTreeNode) {
-      node.children.sort((a, b) => -(a.getTotalWeight() - b.getTotalWeight()))
-      node.children.forEach(visit)
+      let children = node.getChildren()
+      if (children.length >= 1) {
+        children.sort(totWeightCmp)
+        children.forEach(visit)
+      }
     }
     visit(this.groupedCalltreeRoot)
   }
@@ -224,7 +229,7 @@ export class Profile {
 
       let childTime = 0
 
-      node.children.forEach(function (child) {
+      node.getChildren().forEach(function (child) {
         visit(child, start + childTime)
         childTime += child.getTotalWeight()
       })
@@ -359,7 +364,7 @@ export class Profile {
       if (node.frame === focalFrame) {
         nodes.push(node)
       } else {
-        for (let child of node.children) {
+        for (let child of node.getChildren()) {
           visit(child)
         }
       }
@@ -391,7 +396,7 @@ export class Profile {
       function visit(node: CallTreeNode) {
         stack.push(node.frame)
         builder.appendSampleWithWeight(stack, node.getSelfWeight())
-        for (let child of node.children) {
+        for (let child of node.getChildren()) {
           visit(child)
         }
         stack.pop()
@@ -404,7 +409,7 @@ export class Profile {
       if (node.frame === focalFrame) {
         recordSubtree(node)
       } else {
-        for (let child of node.children) {
+        for (let child of node.getChildren()) {
           findCalls(child)
         }
       }
@@ -469,13 +474,12 @@ export class StackListProfileBuilder extends Profile {
     let framesInStack = new Set<Frame>()
 
     for (let frame of stack) {
-      const last = useAppendOrder ? lastOf(node.children) : node.childByFrame(frame)
+      const last = useAppendOrder ? lastOf(node.getChildren()) : node.childByFrame(frame)
       if (last && !last.isFrozen() && last.frame == frame) {
         node = last
       } else {
         const parent = node
         node = new CallTreeNode(frame, node)
-        parent.children.push(node)
         parent.regFrameToChild(frame, node)
       }
       node.addToTotalWeight(weight)
@@ -491,7 +495,7 @@ export class StackListProfileBuilder extends Profile {
     node.addToSelfWeight(weight)
 
     if (useAppendOrder) {
-      for (let child of node.children) {
+      for (let child of node.getChildren()) {
         child.freeze()
       }
     }
@@ -620,13 +624,12 @@ export class CallTreeProfileBuilder extends Profile {
         }
       }
 
-      const last = useAppendOrder ? lastOf(prevTop.children) : prevTop.childByFrame(frame)
+      const last = useAppendOrder ? lastOf(prevTop.getChildren()) : prevTop.childByFrame(frame)
       let node: CallTreeNode
       if (last && !last.isFrozen() && last.frame == frame) {
         node = last
       } else {
         node = new CallTreeNode(frame, prevTop)
-        prevTop.children.push(node)
         prevTop.regFrameToChild(frame, node)
       }
       stack.push(node)
