@@ -336,14 +336,14 @@ export class DynamicBitset {
   private nBits = 0
 
   push(bit: boolean) {
-    this.nBits++
-    if (this.nBits > this.packs.size() << 5) {
+    if (this.nBits >>> 5 >= this.packs.size()) {
       this.packs.push(0)
     }
     if (bit) {
       let at = this.nBits >>> 5
       this.packs.set(at, this.packs.get(at) | (1 << (this.nBits & 31)))
     }
+    this.nBits++
   }
 
   get(index: number): boolean {

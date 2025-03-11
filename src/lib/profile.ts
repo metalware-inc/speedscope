@@ -195,8 +195,8 @@ export class Profile {
   //
   // The "grouped" call tree is one in which each node has at most one child per
   // frame. Nodes are ordered in decreasing order of weight
-  protected appendOrderCalltreeRoot: CallTreeNode
-  protected groupedCalltreeRoot: CallTreeNode
+  protected appendOrderCalltreeRoot: CallTreeNode = new CallTreeNode(Frame.root, null)
+  protected groupedCalltreeRoot: CallTreeNode = new CallTreeNode(Frame.root, null)
 
   public getAppendOrderCalltreeRoot() {
     return this.appendOrderCalltreeRoot
@@ -217,8 +217,6 @@ export class Profile {
     private capacity: number,
   ) {
     this.totalWeight = totalWeight
-    this.appendOrderCalltreeRoot = new CallTreeNode(Frame.root, null)
-    this.groupedCalltreeRoot = new CallTreeNode(Frame.root, null)
     this.smartWeights = new DynamicTypedArray<Float32Array>(Float32Array, capacity)
   }
 
@@ -625,7 +623,7 @@ export class StackListProfileBuilder extends Profile {
       }
     }
     let totSmartWeights: number = 0
-    this.smartWeights.forEach(value => {
+    this.smartWeights.forEach((value, index) => {
       totSmartWeights += value
     })
     this.totalWeight = Math.max(this.totalWeight, totSmartWeights)
