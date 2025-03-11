@@ -27,29 +27,33 @@ export type SymbolRemapper = (
   frame: Frame,
 ) => {name?: string; file?: string; line?: number; col?: number} | null
 
-export class HasWeights {
-  private selfWeight = 0
-  public totalWeight = 0
-  getSelfWeight() {
-    return this.selfWeight
-  }
-  getTotalWeight() {
-    return this.totalWeight
-  }
+export abstract class HasWeights {
+  abstract getSelfWeight(): number
+  abstract setSelfWeight(value: number): any
+
+  abstract getTotalWeight(): number
+  abstract setTotalWeight(value: number): any
+
+  // TODO: move these down towards the implementations, so that the node index
+  // is not looked up several times
   addToTotalWeight(delta: number) {
-    this.totalWeight += delta
+    this.setTotalWeight(this.getTotalWeight() + delta)
   }
   addToSelfWeight(delta: number) {
-    this.selfWeight += delta
+    this.setSelfWeight(this.getSelfWeight() + delta)
   }
 
   overwriteWeightWith(other: HasWeights) {
-    this.selfWeight = other.selfWeight
-    this.totalWeight = other.totalWeight
+    this.setSelfWeight(other.getSelfWeight())
+    this.setTotalWeight(other.getTotalWeight())
   }
 }
 
 export class Frame extends HasWeights {
+  // TODO: change to a Holder/Manager class that is easier to port to WebAssembly
+  private static selfWeights = new DynamicTypedArray<Float32Array>(Float32Array)
+  private static totalWeights = new DynamicTypedArray<Float32Array>(Float32Array)
+
   key: string | number
 
   // Name of the frame. May be a method name, e.g.
@@ -66,6 +70,8 @@ export class Frame extends HasWeights {
   // Column in the file
   col?: number
 
+  index: number
+
   private constructor(info: FrameInfo) {
     super()
     this.key = info.key
@@ -73,6 +79,9 @@ export class Frame extends HasWeights {
     this.file = info.file
     this.line = info.line
     this.col = info.col
+    this.index = Frame.selfWeights.size()
+    Frame.selfWeights.push(0)
+    Frame.totalWeights.push(0)
   }
 
   static root = new Frame({
@@ -83,9 +92,25 @@ export class Frame extends HasWeights {
   static getOrInsert(set: KeyedSet<Frame>, info: FrameInfo) {
     return set.getOrInsert(new Frame(info))
   }
+
+  getTotalWeight(): number {
+    return Frame.totalWeights.get(this.index)
+  }
+  setTotalWeight(value: number): any {
+    Frame.totalWeights.set(this.index, value)
+  }
+
+  getSelfWeight(): number {
+    return Frame.selfWeights.get(this.index)
+  }
+  setSelfWeight(value: number): any {
+    Frame.selfWeights.set(this.index, value)
+  }
 }
 
 export class CallTreeNode extends HasWeights {
+  private index: number = -1
+
   private lazyChildren: CallTreeNode[] | null = null
   private frame2child: RBTree<Frame, CallTreeNode> = null
   private static fakeChildren: CallTreeNode[] = []
@@ -109,6 +134,7 @@ export class CallTreeNode extends HasWeights {
     readonly holder: NodeHolder,
   ) {
     super()
+    this.index = holder.register(this)
   }
 
   childByFrame = (frame: Frame): CallTreeNode | null =>
@@ -242,7 +268,8 @@ export class Profile {
   // classes. Once a Profile instance has been constructed, it should be treated
   // as immutable.
   protected sortGroupedCallTree() {
-    const totWeightCmp = (a: CallTreeNode, b: CallTreeNode) => b.totalWeight - a.totalWeight
+    const totWeightCmp = (a: CallTreeNode, b: CallTreeNode) =>
+      b.getTotalWeight() - a.getTotalWeight()
     function visit(node: CallTreeNode) {
       let children = node.getChildren()
       if (children.length >= 1) {
@@ -604,7 +631,7 @@ export class StackListProfileBuilder extends Profile {
       }
     }
     let totSmartWeights: number = 0
-    this.smartWeights.forEach((value, index) => {
+    this.smartWeights.forEach(value => {
       totSmartWeights += value
     })
     this.totalWeight = Math.max(this.totalWeight, totSmartWeights)
