@@ -1,5 +1,6 @@
 import * as pako from 'pako'
 import {JSON_parse} from 'uint8array-json-parser'
+import {internAllStrings} from '../lib/utils'
 
 export interface ProfileDataSource {
   name(): Promise<string>
@@ -60,7 +61,7 @@ function permissivelyParseJSONString(content: string) {
       content += ']'
     }
   }
-  return JSON.parse(content)
+  return internAllStrings(JSON.parse(content))
 }
 
 function permissivelyParseJSONUint8Array(byteArray: Uint8Array) {
@@ -98,7 +99,7 @@ function permissivelyParseJSONUint8Array(byteArray: Uint8Array) {
       byteArray = newByteArray
     }
   }
-  return JSON_parse(byteArray)
+  return internAllStrings(JSON_parse(byteArray))
 }
 
 export class BufferBackedTextFileContent implements TextFileContent {

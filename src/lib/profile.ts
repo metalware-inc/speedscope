@@ -1,4 +1,4 @@
-import {lastOf, KeyedSet, DynamicBitset} from './utils'
+import {lastOf, KeyedSet, DynamicBitset, StringPool} from './utils'
 import {ValueFormatter, RawValueFormatter} from './value-formatters'
 import {FileFormat} from './file-format-spec'
 // @ts-ignore
@@ -74,9 +74,17 @@ export class Frame extends HasWeights {
 
   private constructor(info: FrameInfo) {
     super()
-    this.key = info.key
-    this.name = info.name
-    this.file = info.file
+    if (typeof info.key === 'string') {
+      this.key = StringPool.intern(info.key)
+    } else {
+      this.key = info.key
+    }
+    this.name = StringPool.intern(info.name)
+    if (typeof info.file === 'string') {
+      this.file = StringPool.intern(info.file)
+    } else {
+      this.file = info.file
+    }
     this.line = info.line
     this.col = info.col
     this.index = Frame.selfWeights.size()
