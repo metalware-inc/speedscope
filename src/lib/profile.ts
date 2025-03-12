@@ -114,6 +114,11 @@ export class Frame extends HasWeights {
   setSelfWeight(value: number): any {
     Frame.selfWeights.set(this.index, value)
   }
+
+  static soaShrinkToFit() {
+    Frame.selfWeights = new DynamicTypedArray<Float32Array>(Float32Array, Frame.selfWeights)
+    Frame.totalWeights = new DynamicTypedArray<Float32Array>(Float32Array, Frame.totalWeights)
+  }
 }
 
 export class CallTreeNode extends HasWeights {
@@ -182,6 +187,27 @@ export class CallTreeNode extends HasWeights {
   }
   setSelfWeight(value: number): any {
     CallTreeNode.selfWeights.set(this.index, value)
+  }
+
+  removeFrame2Child() {
+    this.frame2child = null
+  }
+
+  shrinkToFit() {
+    if (this.lazyChildren) {
+      this.lazyChildren = this.lazyChildren.slice()
+    }
+  }
+
+  static soaShrinkToFit() {
+    CallTreeNode.selfWeights = new DynamicTypedArray<Float32Array>(
+      Float32Array,
+      CallTreeNode.selfWeights,
+    )
+    CallTreeNode.totalWeights = new DynamicTypedArray<Float32Array>(
+      Float32Array,
+      CallTreeNode.totalWeights,
+    )
   }
 }
 
@@ -278,6 +304,8 @@ export class Profile {
         children.sort(totWeightCmp)
         children.forEach(visit)
       }
+      node.removeFrame2Child()
+      node.shrinkToFit()
     }
     visit(this.groupedCalltreeRoot)
   }
@@ -780,6 +808,10 @@ export class CallTreeProfileBuilder extends Profile {
       throw new Error('Tried to complete profile construction with a non-empty stack')
     }
     this.sortGroupedCallTree()
+    CallTreeNode.soaShrinkToFit()
+    Frame.soaShrinkToFit()
+    this.smartWeights = new DynamicTypedArray<Float32Array>(Float32Array, this.smartWeights)
+    this.samples = this.samples.slice()
     return this
   }
 }
