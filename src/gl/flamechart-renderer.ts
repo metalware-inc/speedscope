@@ -7,6 +7,7 @@ import {RowAtlas} from './row-atlas'
 import {Graphics} from './graphics'
 import {FlamechartColorPassRenderer} from './flamechart-color-pass-renderer'
 import {renderInto} from './utils'
+import DynamicTypedArray from 'dynamic-typed-array'
 
 const MAX_BATCH_SIZE = 10000
 
@@ -18,17 +19,40 @@ interface RangeTreeNode {
 }
 
 class RangeTreeLeafNode implements RangeTreeNode {
+  private static smartBounds = new DynamicTypedArray<Float32Array>(Float32Array)
+  private static smartNumPrecedingRectanglesInRow = new DynamicTypedArray<Int32Array>(Int32Array)
+
+  private index: number
+
   constructor(
     private batch: RectangleBatch,
-    private bounds: Rect,
-    private numPrecedingRectanglesInRow: number,
-  ) {}
+    bounds: Rect,
+    numPrecedingRectanglesInRow: number,
+  ) {
+    this.index = RangeTreeLeafNode.smartNumPrecedingRectanglesInRow.size()
+    RangeTreeLeafNode.smartNumPrecedingRectanglesInRow.push(numPrecedingRectanglesInRow)
+    RangeTreeLeafNode.smartBounds.push(
+      bounds.origin.x,
+      bounds.origin.y,
+      bounds.size.x,
+      bounds.size.y,
+    )
+  }
 
   getBatch() {
     return this.batch
   }
   getBounds() {
-    return this.bounds
+    return new Rect(
+      new Vec2(
+        RangeTreeLeafNode.smartBounds.get(this.index * 4),
+        RangeTreeLeafNode.smartBounds.get(this.index * 4 + 1),
+      ),
+      new Vec2(
+        RangeTreeLeafNode.smartBounds.get(this.index * 4 + 2),
+        RangeTreeLeafNode.smartBounds.get(this.index * 4 + 3),
+      ),
+    )
   }
   getRectCount() {
     return this.batch.getRectCount()
@@ -37,10 +61,10 @@ class RangeTreeLeafNode implements RangeTreeNode {
     return []
   }
   getParity() {
-    return this.numPrecedingRectanglesInRow % 2
+    return RangeTreeLeafNode.smartNumPrecedingRectanglesInRow.get(this.index) % 2
   }
   forEachLeafNodeWithinBounds(configSpaceBounds: Rect, cb: (leaf: RangeTreeLeafNode) => void) {
-    if (!this.bounds.hasIntersectionWith(configSpaceBounds)) return
+    if (!this.getBounds().hasIntersectionWith(configSpaceBounds)) return
     cb(this)
   }
 }
