@@ -144,8 +144,9 @@ export class CallTreeNode extends HasWeights {
     CallTreeNode.frozens.push(false)
   }
 
-  childByFrame = (frame: Frame): CallTreeNode | null =>
-    this.frame2child ? this.frame2child.get(frame) : null
+  childByFrame(frame: Frame): CallTreeNode | null {
+    return this.frame2child ? this.frame2child.get(frame) : null
+  }
 
   regFrameToChild(frame: Frame, child: CallTreeNode) {
     if (!this.frame2child) {
@@ -157,8 +158,9 @@ export class CallTreeNode extends HasWeights {
     this.lazyChildren.push(child)
   }
 
-  getChildren = (): CallTreeNode[] =>
-    this.lazyChildren ? this.lazyChildren : CallTreeNode.fakeChildren
+  getChildren(): CallTreeNode[] {
+    return this.lazyChildren ? this.lazyChildren : CallTreeNode.fakeChildren
+  }
 
   getTotalWeight(): number {
     return CallTreeNode.totalWeights.get(this.index)
