@@ -52,9 +52,11 @@ async function importProfilesFromArrayBuffer(
   return (await importModule).importProfilesFromArrayBuffer(fileName, contents)
 }
 
-async function importProfilesFromFile(file: File): Promise<ProfileGroup | null> {
-  return (await importModule).importProfilesFromFile(file)
-}
+// NOTE: this approach doesn't release the file contents timely, thus 10M frames get out of memory in Chrome
+// async function importProfilesFromFile(file: File): Promise<ProfileGroup | null> {
+//   return (await importModule).importProfilesFromFile(file)
+// }
+
 async function importFromFileSystemDirectoryEntry(entry: FileSystemDirectoryEntry) {
   return (await importModule).importFromFileSystemDirectoryEntry(entry)
 }
@@ -234,12 +236,34 @@ export class Application extends StatelessComponent<ApplicationProps> {
     return getStyle(this.props.theme)
   }
 
+  sleep(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms))
+  }
+
   async loadReleasingFile(file: File) {
+    let fileName: string | null
+    let fileData: ArrayBuffer | null
+    let reader: FileReader | null = new FileReader()
+    let isDone = false
+    reader.onloadend = () => {
+      fileName = file.name
+      // @ts-ignore
+      fileData = reader.result
+      isDone = true
+    }
+    reader.readAsArrayBuffer(file)
+
+    while (!isDone) {
+      await this.sleep(10)
+    }
+    reader = null
+
     let profileGroup: ProfileGroup | null
     {
       profileGroup = await this.loadProfile({
         fn: async () => {
-          const profiles = await importProfilesFromFile(file)
+          const profiles =
+            fileData && fileName ? await importProfilesFromArrayBuffer(fileName, fileData) : null
           if (profiles) {
             for (let profile of profiles.profiles) {
               if (!profile.getName()) {
@@ -305,6 +329,8 @@ export class Application extends StatelessComponent<ApplicationProps> {
       })
     }
 
+    fileData = null
+    fileName = null
     if (profileGroup) {
       this.props.setProfileGroup(profileGroup)
       this.props.setLoading(false)

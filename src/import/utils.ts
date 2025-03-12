@@ -254,14 +254,12 @@ export class MaybeCompressedDataReader implements ProfileDataSource {
 
   static fromFile(file: File): MaybeCompressedDataReader {
     const maybeCompressedDataPromise: Promise<ArrayBuffer> = new Promise(resolve => {
-      let reader: FileReader | null = new FileReader()
+      let reader = new FileReader()
       reader.addEventListener('loadend', () => {
-        if (!(reader?.result instanceof ArrayBuffer)) {
+        if (!(reader.result instanceof ArrayBuffer)) {
           throw new Error('Expected reader.result to be an instance of ArrayBuffer')
         }
-        let ans = reader?.result
-        reader = null
-        resolve(ans)
+        resolve(reader.result)
       })
       reader.readAsArrayBuffer(file)
     })
