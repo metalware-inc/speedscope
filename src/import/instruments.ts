@@ -105,7 +105,7 @@ function getWeight(deepCopyRow: any): number {
 
 // Import from a deep copy made of a profile
 export function importFromInstrumentsDeepCopy(contents: TextFileContent): Profile {
-  const profile = new CallTreeProfileBuilder()
+  const profile = new CallTreeProfileBuilder(0, 0)
   const rows = parseTSV<PastedTimeProfileRow | PastedAllocationsProfileRow>(contents)
 
   const stack: FrameInfoWithWeight[] = []
@@ -518,7 +518,7 @@ export function importThreadFromInstrumentsTrace(args: {
   const backtraceIDtoStack = new Map<number, FrameInfo[]>()
   samples = samples.filter(s => s.threadID === threadID)
 
-  const profile = new StackListProfileBuilder(lastOf(samples)!.timestamp)
+  const profile = new StackListProfileBuilder(lastOf(samples)!.timestamp, 0)
   profile.setName(`${fileName} - thread ${threadID}`)
 
   function appendRecursive(k: number, stack: FrameInfo[]) {

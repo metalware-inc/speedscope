@@ -102,7 +102,7 @@ function importSpeedscopeProfile(
   function importEventedProfile(evented: FileFormat.EventedProfile) {
     const {startValue, endValue, events} = evented
 
-    const profile = new CallTreeProfileBuilder(endValue - startValue)
+    const profile = new CallTreeProfileBuilder(endValue - startValue, events.length)
     setCommonProperties(profile)
 
     const frameInfos: FrameInfo[] = frames.map((frame, i) => ({key: i, ...frame}))
@@ -146,7 +146,7 @@ function importSpeedscopeProfile(
 
   function importSampledProfile(sampled: FileFormat.SampledProfile) {
     const {startValue, endValue, samples, weights} = sampled
-    const profile = new StackListProfileBuilder(endValue - startValue)
+    const profile = new StackListProfileBuilder(endValue - startValue, samples.length)
     setCommonProperties(profile)
 
     const frameInfos: FrameInfo[] = frames.map((frame, i) => ({key: i, ...frame}))

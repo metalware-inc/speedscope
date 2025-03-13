@@ -1,3 +1,5 @@
+import DynamicTypedArray from 'dynamic-typed-array'
+
 export function lastOf<T>(ts: T[]): T | null {
   return ts[ts.length - 1] || null
 }
@@ -327,4 +329,81 @@ export function decodeBase64(encoded: string): Uint8Array {
   }
 
   return bytes
+}
+
+export class DynamicBitset {
+  private packs = new DynamicTypedArray<Uint32Array>(Uint32Array)
+  private nBits = 0
+
+  push(bit: boolean) {
+    if (this.nBits >>> 5 >= this.packs.size()) {
+      this.packs.push(0)
+    }
+    if (bit) {
+      let at = this.nBits >>> 5
+      this.packs.set(at, this.packs.get(at) | (1 << (this.nBits & 31)))
+    }
+    this.nBits++
+  }
+
+  get(index: number): boolean {
+    return !!(this.packs.get(index >>> 5) & (1 << (index & 31)))
+  }
+
+  set(index: number, bit: boolean) {
+    if (bit) {
+      this.packs.set(index >>> 5, this.packs.get(index >>> 5) | (1 << (index & 31)))
+    } else {
+      this.packs.set(index >>> 5, this.packs.get(index >>> 5) & ~(1 << (index & 31)))
+    }
+  }
+}
+
+function isChromeFeatureBased(): boolean {
+  // @ts-ignore
+  return !!window.chrome
+}
+
+export class StringPool {
+  private static interned = isChromeFeatureBased() ? null : new Map<string, string>()
+
+  static intern(str: string): string {
+    if (StringPool.interned === null) {
+      return str
+    }
+    const existing = StringPool.interned.get(str)
+    if (existing !== undefined) {
+      return existing
+    }
+    StringPool.interned.set(str, str)
+    return str
+  }
+}
+
+/**
+ * Recursively visits all properties in `data`.
+ * Whenever a string is found, it replaces it with the interned version.
+ */
+export function internAllStrings<T>(data: T): T {
+  if (isChromeFeatureBased()) {
+    return data
+  }
+  if (typeof data === 'string') {
+    // Replace the string with its interned counterpart
+    return StringPool.intern(data) as unknown as T
+  } else if (Array.isArray(data)) {
+    // For arrays, recurse on each element
+    for (let i = 0; i < data.length; i++) {
+      data[i] = internAllStrings(data[i])
+    }
+  } else if (data !== null && typeof data === 'object') {
+    // For objects, recurse on each property
+    for (const key in data) {
+      // It's safe to cast here, because we know data is an object
+      ;(data as Record<string, unknown>)[key] = internAllStrings(
+        (data as Record<string, unknown>)[key],
+      )
+    }
+  }
+  return data
 }

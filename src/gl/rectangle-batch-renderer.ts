@@ -2,6 +2,7 @@ import {Rect, Vec2, AffineTransform} from '../lib/math'
 import {Color} from '../lib/color'
 import {Graphics} from './graphics'
 import {setUniformAffineTransform} from './utils'
+import DynamicTypedArray from 'dynamic-typed-array'
 
 const vertexFormat = new Graphics.VertexFormat()
 vertexFormat.add('configSpacePos', Graphics.AttributeType.FLOAT, 2)
@@ -31,12 +32,43 @@ const frag = `
 `
 
 export class RectangleBatch {
-  private rects: Rect[] = []
-  private colors: Color[] = []
+  // TODO: is Uint16 enough for each coordinate? Are they screen coordinates in pixels?
+  // Layout: origin.x, origin.y, size.x, size.y
+  private smartRects = new DynamicTypedArray<Float32Array>(Float32Array)
+  // Layout: red, green, blue, alpha
+  private smartColors = new DynamicTypedArray<Uint8Array>(Uint8Array)
+
+  getRect(index: number): Rect {
+    return new Rect(
+      new Vec2(this.smartRects.get(index * 4), this.smartRects.get(index * 4 + 1)),
+      new Vec2(this.smartRects.get(index * 4 + 2), this.smartRects.get(index * 4 + 3)),
+    )
+  }
+  pushRect(rect: Rect) {
+    this.smartRects.push(rect.origin.x, rect.origin.y, rect.size.x, rect.size.y)
+  }
+
+  getColor(index: number): Color {
+    return new Color(
+      this.smartColors.get(4 * index) / 255.0,
+      this.smartColors.get(4 * index + 1) / 255.0,
+      this.smartColors.get(4 * index + 2) / 255.0,
+      this.smartColors.get(4 * index + 3) / 255.0,
+    )
+  }
+  pushColor(color: Color) {
+    this.smartColors.push(
+      Math.round(color.r * 255),
+      Math.round(color.g * 255),
+      Math.round(color.b * 255),
+      Math.round(color.a * 255),
+    )
+  }
+
   constructor(private gl: Graphics.Context) {}
 
   getRectCount() {
-    return this.rects.length
+    return this.smartRects.size() / 4
   }
 
   private buffer: Graphics.VertexBuffer | null = null
@@ -54,13 +86,13 @@ export class RectangleBatch {
       [1, 1],
     ]
 
-    const bytes = new Uint8Array(vertexFormat.stride * corners.length * this.rects.length)
+    const bytes = new Uint8Array(vertexFormat.stride * corners.length * this.getRectCount())
     const floats = new Float32Array(bytes.buffer)
     let idx = 0
 
-    for (let i = 0; i < this.rects.length; i++) {
-      const rect = this.rects[i]
-      const color = this.colors[i]
+    for (let i = 0; i < this.getRectCount(); i++) {
+      const rect = this.getRect(i)
+      const color = this.getColor(i)
 
       // TODO(jlfwong): In the conversion from regl to graphics.ts, I lost the
       // ability to do instanced drawing. This is a pretty significant hit to
@@ -87,8 +119,8 @@ export class RectangleBatch {
   }
 
   addRect(rect: Rect, color: Color) {
-    this.rects.push(rect)
-    this.colors.push(color)
+    this.pushRect(rect)
+    this.pushColor(color)
 
     if (this.buffer) {
       this.buffer.free()
