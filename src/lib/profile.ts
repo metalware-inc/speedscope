@@ -802,9 +802,11 @@ export class CallTreeProfileBuilder extends Profile {
   }
 
   leaveAllOpenFrames() {
+    const autoEndAt = this.getTotalWeight() + 1;
     while (this.stack.length > 0) {
+      console.log('auto-leaving frame', this.stack[this.stack.length - 1].name, ' with key', this.stack[this.stack.length - 1].key);
       let frame = this.stack[this.stack.length - 1]
-      this.leaveFrame({name: frame.name, key: frame.key}, this.getTotalWeight())
+      this.leaveFrame({name: frame.name, key: frame.key}, autoEndAt)
     }
   }
 
