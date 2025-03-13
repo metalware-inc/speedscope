@@ -802,19 +802,9 @@ export class CallTreeProfileBuilder extends Profile {
   }
 
   leaveAllOpenFrames() {
-    while (this.appendOrderStack.length > 1) {
-      let top_el = this.appendOrderStack[this.appendOrderStack.length - 1]
-      if (top_el == null) {
-        throw new Error('Tried to leave all open frames when stack is empty')
-      }
-      this._leaveFrame(top_el.frame, this.lastValue, true)
-    }
-    while (this.groupedOrderStack.length > 1) {
-      let top_el = this.groupedOrderStack[this.groupedOrderStack.length - 1]
-      if (top_el == null) {
-        throw new Error('Tried to leave all open frames when stack is empty')
-      }
-      this._leaveFrame(top_el.frame, this.lastValue, false)
+    while (this.stack.length > 0) {
+      let frame = this.stack[this.stack.length - 1]
+      this.leaveFrame({name: frame.name, key: frame.key}, this.getTotalWeight())
     }
   }
 
