@@ -236,6 +236,13 @@ export class Application extends StatelessComponent<ApplicationProps> {
     return getStyle(this.props.theme)
   }
 
+  handleProfileGroup(profileGroup: ProfileGroup | null) {
+    if (profileGroup) {
+      this.props.setProfileGroup(profileGroup)
+      this.props.setLoading(false)
+    }
+  }
+
   sleep(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms))
   }
@@ -331,10 +338,7 @@ export class Application extends StatelessComponent<ApplicationProps> {
 
     fileData = null
     fileName = null
-    if (profileGroup) {
-      this.props.setProfileGroup(profileGroup)
-      this.props.setLoading(false)
-    }
+    this.handleProfileGroup(profileGroup)
   }
 
   loadFromFile(file: File) {
@@ -348,6 +352,8 @@ export class Application extends StatelessComponent<ApplicationProps> {
         const data = await fetch(exampleProfileURL).then(resp => resp.text())
         return await importProfilesFromText(filename, data)
       },
+    }).then(profileGroup => {
+      this.handleProfileGroup(profileGroup)
     })
   }
 
@@ -373,6 +379,8 @@ export class Application extends StatelessComponent<ApplicationProps> {
           fn: async () => {
             return await importFromFileSystemDirectoryEntry(webkitDirectoryEntry)
           },
+        }).then(profileGroup => {
+          this.handleProfileGroup(profileGroup)
         })
         return
       }
@@ -461,6 +469,8 @@ export class Application extends StatelessComponent<ApplicationProps> {
       fn: async () => {
         return await importProfilesFromText('From Clipboard', pasted)
       },
+    }).then(profileGroup => {
+      this.handleProfileGroup(profileGroup)
     })
   }
 
@@ -495,6 +505,8 @@ export class Application extends StatelessComponent<ApplicationProps> {
           }
           return await importProfilesFromArrayBuffer(filename, await response.arrayBuffer())
         },
+      }).then(profileGroup => {
+        this.handleProfileGroup(profileGroup)
       })
     } else if (this.props.hashParams.localProfilePath) {
       // There isn't good cross-browser support for XHR of local files, even from
@@ -503,7 +515,11 @@ export class Application extends StatelessComponent<ApplicationProps> {
       ;(window as any)['speedscope'] = {
         loadFileFromBase64: (filename: string, base64source: string) => {
           // TODO (srogatch): is async missing here intnetionally? Or is it a bug?
-          this.loadProfile({fn: () => importProfilesFromBase64(filename, base64source)})
+          this.loadProfile({fn: () => importProfilesFromBase64(filename, base64source)}).then(
+            profileGroup => {
+              this.handleProfileGroup(profileGroup)
+            },
+          )
         },
       }
 
