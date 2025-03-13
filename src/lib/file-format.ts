@@ -132,13 +132,7 @@ function importSpeedscopeProfile(
     }
 
     // Auto-close any frames that are still open at the end of the profile
-    for (let i = openFrames.length - 1; i >= 0; i--) {
-      const frameInfo = openFrames[i]
-      console.warn(
-        `Frame "${frameInfo.name}" was still open at end of profile. Closing automatically.`,
-      )
-      profile.leaveFrame(frameInfo, profile.getTotalWeight())
-    }
+    profile.leaveAllOpenFrames()
 
     console.log('imported evented profile')
     return profile.build()

@@ -801,6 +801,23 @@ export class CallTreeProfileBuilder extends Profile {
     this.totalWeight = Math.max(this.totalWeight, this.lastValue)
   }
 
+  leaveAllOpenFrames() {
+    while (this.appendOrderStack.length > 1) {
+      let top_el = this.appendOrderStack[this.appendOrderStack.length - 1]
+      if (top_el == null) {
+        throw new Error('Tried to leave all open frames when stack is empty')
+      }
+      this._leaveFrame(top_el.frame, this.lastValue, true)
+    }
+    while (this.groupedOrderStack.length > 1) {
+      let top_el = this.groupedOrderStack[this.groupedOrderStack.length - 1]
+      if (top_el == null) {
+        throw new Error('Tried to leave all open frames when stack is empty')
+      }
+      this._leaveFrame(top_el.frame, this.lastValue, false)
+    }
+  }
+
   build(): Profile {
     // Each stack is expected to contain a single node which we initialize to be
     // the root node.
