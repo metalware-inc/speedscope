@@ -1,4 +1,4 @@
-import {lastOf, KeyedSet, DynamicBitset, StringPool} from './utils'
+import {lastOf, KeyedSet, DynamicBitset, StringPool, FunctionSymbols} from './utils'
 import {ValueFormatter, RawValueFormatter} from './value-formatters'
 import {FileFormat} from './file-format-spec'
 // @ts-ignore
@@ -84,6 +84,12 @@ export class Frame extends HasWeights {
       this.file = StringPool.intern(info.file)
     } else {
       this.file = info.file
+    }
+    if (this.name.startsWith('0x')) {
+      let tentative_name = FunctionSymbols.resolveAddr(parseInt(this.name, 16))
+      if (tentative_name) {
+        this.name = tentative_name
+      }
     }
     this.line = info.line
     this.col = info.col
@@ -802,9 +808,8 @@ export class CallTreeProfileBuilder extends Profile {
   }
 
   leaveAllOpenFrames() {
-    const autoEndAt = this.getTotalWeight() + 1;
+    const autoEndAt = this.getTotalWeight() + 1
     while (this.stack.length > 0) {
-      console.log('auto-leaving frame', this.stack[this.stack.length - 1].name, ' with key', this.stack[this.stack.length - 1].key);
       let frame = this.stack[this.stack.length - 1]
       this.leaveFrame({name: frame.name, key: frame.key}, autoEndAt)
     }

@@ -359,6 +359,39 @@ export class DynamicBitset {
   }
 }
 
+export class BinarySymbol {
+  constructor(
+    readonly address: number,
+    readonly size: number,
+    readonly name: string,
+  ) {}
+}
+
+export class FunctionSymbols {
+  private static address_to_name = new Map<number, string>()
+  private static address_to_symbol = new Map<number, BinarySymbol>()
+
+  static addSymbol(a: number, name: string) {
+    let address = a & ~1 // remove thumb bit
+    this.address_to_symbol.set(address, new BinarySymbol(address, 1, name))
+  }
+
+  static resolveAddr(address: number) {
+    if (this.address_to_name.has(address)) {
+      return this.address_to_name.get(address)
+    }
+
+    // find the symbol that contains the address
+    for (const symbol of this.address_to_symbol.values()) {
+      if (address >= symbol.address && address <= symbol.address + symbol.size) {
+        this.address_to_name.set(address, symbol.name)
+        return symbol.name
+      }
+    }
+    return null
+  }
+}
+
 function isChromeFeatureBased(): boolean {
   // @ts-ignore
   return !!window.chrome

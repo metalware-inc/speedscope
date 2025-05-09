@@ -19,6 +19,7 @@ import {canUseXHR} from '../app-state'
 import {ProfileGroupState} from '../app-state/profile-group'
 import {HashParams} from '../lib/hash-params'
 import {StatelessComponent} from '../lib/preact-helpers'
+import {FunctionSymbols} from '../lib/utils'
 import {SandwichViewContainer} from './sandwich-view'
 
 const importModule = import('../import')
@@ -488,7 +489,7 @@ export class Application extends StatelessComponent<ApplicationProps> {
   }
 
   async maybeLoadHashParamProfile() {
-    const {profileURL} = this.props.hashParams
+    const {profileURL, symbolsURL} = this.props.hashParams
     if (profileURL) {
       if (!canUseXHR) {
         alert(
@@ -508,6 +509,18 @@ export class Application extends StatelessComponent<ApplicationProps> {
       }).then(profileGroup => {
         this.handleProfileGroup(profileGroup)
       })
+
+      if (symbolsURL) {
+        // Function symbols format:
+        // [[134282760,0,"LoopCopyDataInit"],[134282754,0,"CopyDataInit"],[134282778,0,"LoopFillZerobss"],..]
+        const response: Response = await fetch(symbolsURL)
+        const symbolsURLData = await response.text()
+        const symbolsURLDataJSON = JSON.parse(symbolsURLData)
+
+        for (const symbol of symbolsURLDataJSON) {
+          FunctionSymbols.addSymbol(symbol[0], symbol[2])
+        }
+      }
     } else if (this.props.hashParams.localProfilePath) {
       // There isn't good cross-browser support for XHR of local files, even from
       // other local files. To work around this restriction, we load the local profile
