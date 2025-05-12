@@ -490,6 +490,19 @@ export class Application extends StatelessComponent<ApplicationProps> {
 
   async maybeLoadHashParamProfile() {
     const {profileURL, symbolsURL} = this.props.hashParams
+
+    if (symbolsURL) {
+      // Function symbols format:
+      // [[134282760,0,"LoopCopyDataInit"],[134282754,0,"CopyDataInit"],[134282778,0,"LoopFillZerobss"],..]
+      const response: Response = await fetch(symbolsURL)
+      const symbolsURLData = await response.text()
+      const symbolsURLDataJSON = JSON.parse(symbolsURLData)
+
+      for (const symbol of symbolsURLDataJSON) {
+        FunctionSymbols.addSymbol(symbol[0], symbol[2])
+      }
+    }
+
     if (profileURL) {
       if (!canUseXHR) {
         alert(
@@ -509,18 +522,6 @@ export class Application extends StatelessComponent<ApplicationProps> {
       }).then(profileGroup => {
         this.handleProfileGroup(profileGroup)
       })
-
-      if (symbolsURL) {
-        // Function symbols format:
-        // [[134282760,0,"LoopCopyDataInit"],[134282754,0,"CopyDataInit"],[134282778,0,"LoopFillZerobss"],..]
-        const response: Response = await fetch(symbolsURL)
-        const symbolsURLData = await response.text()
-        const symbolsURLDataJSON = JSON.parse(symbolsURLData)
-
-        for (const symbol of symbolsURLDataJSON) {
-          FunctionSymbols.addSymbol(symbol[0], symbol[2])
-        }
-      }
     } else if (this.props.hashParams.localProfilePath) {
       // There isn't good cross-browser support for XHR of local files, even from
       // other local files. To work around this restriction, we load the local profile
