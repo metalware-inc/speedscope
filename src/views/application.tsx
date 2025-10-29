@@ -499,7 +499,7 @@ export class Application extends StatelessComponent<ApplicationProps> {
       const symbolsURLDataJSON = JSON.parse(symbolsURLData)
 
       for (const symbol of symbolsURLDataJSON) {
-        FunctionSymbols.addSymbol(symbol[0], symbol[2])
+        FunctionSymbols.addSymbol(symbol[0], symbol[1])
       }
     }
 
