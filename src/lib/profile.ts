@@ -252,6 +252,8 @@ export class Profile {
   protected samples: CallTreeNode[] = []
   protected smartWeights: DynamicTypedArray<Float32Array>
 
+  protected instantEvents: {start: number; name: string}[] = []
+
   protected valueFormatter: ValueFormatter = new RawValueFormatter()
 
   constructor(
@@ -342,6 +344,7 @@ export class Profile {
   forEachCall(
     openFrame: (node: CallTreeNode, value: number) => void,
     closeFrame: (node: CallTreeNode, value: number) => void,
+    addInstantEvent: (event: InstantEvent) => void,
   ) {
     let prevStack: CallTreeNode[] = []
     let value = 0
@@ -388,6 +391,12 @@ export class Profile {
     // Close frames that are open at the end of the trace
     for (let i = prevStack.length - 1; i >= 0; i--) {
       closeFrame(prevStack[i], value)
+    }
+
+    // Add instant events
+    for (let event of this.instantEvents) {
+      console.log('addInstantEvent(', event, ')')
+      addInstantEvent(event)
     }
   }
 
@@ -750,6 +759,11 @@ export class CallTreeProfileBuilder extends Profile {
     this.framesInStack.set(frame, frameCount + 1)
     this.lastValue = value
     this.totalWeight = Math.max(this.totalWeight, this.lastValue)
+  }
+
+  addInstantEvent(frameInfo: FrameInfo, value: number) {
+    console.log('addInstantEvent', frameInfo, value)
+    this.instantEvents.push({start: value, name: frameInfo.name})
   }
 
   private _leaveFrame(frame: Frame, value: number, useAppendOrder: boolean) {
